@@ -3,7 +3,7 @@ let layoutsList = [];
 let globalDatasources
 
 // Checks for generic interface availability on calling device
-function supportsInterface(handlerInput, interfaceName){
+function supportsInterface(handlerInput, interfaceName) {
     const interfaces = ((((
         handlerInput.requestEnvelope.context || {})
         .System || {})
@@ -27,38 +27,32 @@ function retrieveFilesFromLambda() {
     const testFolder = './layouts/';
     const fs = require('fs');
 
-    try 
-    {
-    fs.readdirSync(testFolder).forEach(file => {
-        if (file.endsWith("_datasources.json")) 
-        {
-            console.log("skipping " + file + " since datasources")
-        }
-        else 
-        {
-            if (file.endsWith(".json"))
-            {
-                layoutsList.push(file)
+    try {
+        fs.readdirSync(testFolder).forEach(file => {
+            if (file.endsWith("_datasources.json")) {
+                console.log("skipping " + file + " since datasources")
             }
-        }
-                                                })
-        }
-        catch (error) {
+            else {
+                if (file.endsWith(".json")) {
+                    layoutsList.push(file)
+                }
+            }
+        })
+    }
+    catch (error) {
         console.log("error: ", error)
-        }
+    }
 }
 
 // Checks if the file is exported from the authoring tool (contains both "document" and "datasources" key)
-function isExported (fileName)
-{
+function isExported(fileName) {
     let fs = require('fs');
-    let documentObject = JSON.parse(fs.readFileSync('./layouts/'+ fileName, 'utf8'));
+    let documentObject = JSON.parse(fs.readFileSync('./layouts/' + fileName, 'utf8'));
     return (documentObject.hasOwnProperty("document") && documentObject.hasOwnProperty("datasources"))
 }
 
 // Builds the datasources object that will eventually populate the Sequence with filename(s).
-function buildDataSources()
-{
+function buildDataSources() {
     let fs = require('fs');
     let dataSourcesObject = JSON.parse(fs.readFileSync('./data.json', 'utf8'));
     dataSourcesObject.data.values = layoutsList;
@@ -67,53 +61,48 @@ function buildDataSources()
 }
 
 // Lets you render the document regardless of how it's made. doesn't matter if exported from the outhoring tool or copy-pasted in separate files.
-function inflateDocument(handlerInput, layoutToInflate)
-{
-    let speakOutput,doc,data
+function inflateDocument(handlerInput, layoutToInflate) {
+    let speakOutput, doc, data
     let fs = require('fs')
-    let documentObject = JSON.parse(fs.readFileSync('./layouts/'+ layoutToInflate, 'utf8'));
-    
+    let documentObject = JSON.parse(fs.readFileSync('./layouts/' + layoutToInflate, 'utf8'));
+
     // If both "document" and "datasources" key are present in the same file, use the "datasources" of the file itself
-    if (isExported(layoutToInflate))
-    {
+    if (isExported(layoutToInflate)) {
         doc = documentObject.document
         data = documentObject.datasources
         speakOutput = "Rendering " + layoutToInflate
     }
-    
+
     // If a file ending in _datasources.json is present, use it as "datasources" of the chosen layout to render
-    else
-    {
+    else {
         doc = documentObject
-        let path = './layouts/'+ layoutToInflate
-        console.log ("PATH NEW: " + path)
-        path = path.replace('.json','_datasources.json')
+        let path = './layouts/' + layoutToInflate
+        console.log("PATH NEW: " + path)
+        path = path.replace('.json', '_datasources.json')
         try {
-            
-        if (fs.existsSync(path)) 
-        {
-            data = JSON.parse(fs.readFileSync(path, 'utf8'));
-        }
-        
-         else
-        {
-            data = null
-        }
-        
-        } catch(err) {
-        console.error(err)
+
+            if (fs.existsSync(path)) {
+                data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            }
+
+            else {
+                data = null
+            }
+
+        } catch (err) {
+            console.error(err)
         }
         speakOutput = "Rendering " + layoutToInflate
 
     }
-         
-         return handlerInput.responseBuilder
+
+    return handlerInput.responseBuilder
         .speak(speakOutput)
-         .addDirective({
-          type:'Alexa.Presentation.APL.RenderDocument',
-          token :'documentToken',
-          document: doc,
-          datasources: data,
+        .addDirective({
+            type: 'Alexa.Presentation.APL.RenderDocument',
+            token: 'documentToken',
+            document: doc,
+            datasources: data,
         })
         .getResponse();
 
@@ -121,37 +110,31 @@ function inflateDocument(handlerInput, layoutToInflate)
 
 // APL UserEvent handler (TouchWrapper)
 const sendEventHandler = {
-  canHandle(handlerInput) { 
-    const request = handlerInput.requestEnvelope.request;
+    canHandle(handlerInput) {
+        const request = handlerInput.requestEnvelope.request;
 
-    // Catches the APL.UserEvent
-    return request.type === 'Alexa.Presentation.APL.UserEvent' && request.arguments.length > 0;
-  },
-  handle(handlerInput) {
+        // Catches the APL.UserEvent
+        return request.type === 'Alexa.Presentation.APL.UserEvent' && request.arguments.length > 0;
+    },
+    handle(handlerInput) {
+        // Checks if the request comes from the load button and retrieves the layout to inflate
+        let loadButtonPressed = (handlerInput.requestEnvelope.request.arguments[0] === "render")
+        if (loadButtonPressed) {
+            // Gets the file name of the layout to render. (components[] array of the APL.UserEvent)
+            let layoutToInflate = (handlerInput.requestEnvelope.request.components.fileNameToLoad);
 
-    // Logs the incoming UserEvent
-    console.log("APL UserEvent to the skill: " + JSON.stringify(handlerInput.requestEnvelope.request))
-    
-    // Checks if the request comes from the load button and retrieves the layout to inflate
-    let loadButtonPressed = (handlerInput.requestEnvelope.request.arguments[0] === "render")
-    if (loadButtonPressed) 
-    {
-        // Gets the file name of the layout to render. (components[] array of the APL.UserEvent)
-        let layoutToInflate = (handlerInput.requestEnvelope.request.components.fileNameToLoad);
-    
-        // Calls the inflateDocument function that has all the logic
-        if (layoutToInflate == "dummy")
-        {
-            return handlerInput.responseBuilder
-            .speak("No document selected")
-            .getResponse();
+            // Calls the inflateDocument function that has all the logic
+            if (layoutToInflate == "dummy") {
+                return handlerInput.responseBuilder
+                    .speak("No document selected")
+                    .getResponse();
+            }
+            return inflateDocument(handlerInput, layoutToInflate)
         }
-        return inflateDocument(handlerInput, layoutToInflate)
-    }
-      
 
-  }
-    
+
+    }
+
 }
 
 const LaunchRequestHandler = {
@@ -162,35 +145,30 @@ const LaunchRequestHandler = {
         layoutsList = [];
         globalDatasources = buildDataSources()
         retrieveFilesFromLambda()
-        
-        //Logs the request
-        console.log("LaunchRequest request: " + JSON.stringify(handlerInput.requestEnvelope))
 
         // Checks if APL is supported:
-        if (supportsAPL(handlerInput))
-        {
-        const speakOutput = 'Welcome to APL Playground. Please select a document to render.';
-        return handlerInput.responseBuilder
-            .speak(speakOutput)
-            .addDirective({
-          type:'Alexa.Presentation.APL.RenderDocument',
-          token :'documentToken',
-          document: require('./launchRequest.json'),
-          datasources: globalDatasources,
-        })
-            .getResponse();
-    }
+        if (supportsAPL(handlerInput)) {
+            const speakOutput = 'Welcome to APL Playground. Please select a document to render.';
+            return handlerInput.responseBuilder
+                .speak(speakOutput)
+                .addDirective({
+                    type: 'Alexa.Presentation.APL.RenderDocument',
+                    token: 'documentToken',
+                    document: require('./launchRequest.json'),
+                    datasources: globalDatasources,
+                })
+                .getResponse();
+        }
 
-    else
-    {
-        const speakOutput = 'Welcome to APL Playground. You need a screen-enabled device to use the skill.';
+        else {
+            const speakOutput = 'Welcome to APL Playground. You need a screen-enabled device to use the skill.';
             return handlerInput.responseBuilder
                 .speak(speakOutput)
                 .getResponse();
-        
-    }
-        
-      
+
+        }
+
+
     }
 };
 
@@ -204,11 +182,11 @@ const backToSelectionIntentHandler = {
         const speakOutput = 'Back to Selection';
         return handlerInput.responseBuilder
             .addDirective({
-          type:'Alexa.Presentation.APL.RenderDocument',
-          token :'documentToken',
-          document: require('./launchRequest.json'),
-          datasources: globalDatasources,
-        })
+                type: 'Alexa.Presentation.APL.RenderDocument',
+                token: 'documentToken',
+                document: require('./launchRequest.json'),
+                datasources: globalDatasources,
+            })
             .getResponse();
 
     }
@@ -221,53 +199,52 @@ const executeCommandIntentHandler = {
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'executeCommandIntent';
     },
     handle(handlerInput) {
-      const speakOutput = "OK, executing your command.";
-      console.log("FULL JSON REQUEST FROM executeCommandIntentHandler" + JSON.stringify(handlerInput.requestEnvelope))
-      
-      // Add your JSON commands here
-      let customCommandToSend = {
-        "type": "AnimateItem",
-        "easing": "ease-in-out",
-        "duration": 1000,
-        "componentId": "mainText",
-        "value": [
-          {
-            "property": "opacity",
-            "to": 1
-          },
-          {
-            "property": "transform",
-            "from": [
-              {
-                "translateY": 0
-              },
-              {
-                "rotate": 360
-              }
-            ],
-            "to": [
-              {
-                "translateY": 250
-              },
-              {
-                "rotate": 0
-              }
-            ]
-          }
-        ]
-}
-       
-       return handlerInput.responseBuilder
-       .speak(speakOutput)
-       .addDirective({
-           type: 'Alexa.Presentation.APL.ExecuteCommands',
-           token: "documentToken",
-           commands: [customCommandToSend]
-       })
-       .getResponse();
+        const speakOutput = "OK, executing your command.";
 
-                  
-   }
+        // Add your JSON commands here
+        let customCommandToSend = {
+            "type": "AnimateItem",
+            "easing": "ease-in-out",
+            "duration": 1000,
+            "componentId": "mainText",
+            "value": [
+                {
+                    "property": "opacity",
+                    "to": 1
+                },
+                {
+                    "property": "transform",
+                    "from": [
+                        {
+                            "translateY": 0
+                        },
+                        {
+                            "rotate": 360
+                        }
+                    ],
+                    "to": [
+                        {
+                            "translateY": 250
+                        },
+                        {
+                            "rotate": 0
+                        }
+                    ]
+                }
+            ]
+        }
+
+        return handlerInput.responseBuilder
+            .speak(speakOutput)
+            .addDirective({
+                type: 'Alexa.Presentation.APL.ExecuteCommands',
+                token: "documentToken",
+                commands: [customCommandToSend]
+            })
+            .getResponse();
+
+
+    }
 };
 
 const HelpIntentHandler = {
@@ -353,4 +330,18 @@ exports.handler = Alexa.SkillBuilders.custom()
     .addErrorHandlers(
         ErrorHandler,
     )
+    .addRequestInterceptors(function (handlerInput) {
+        const { requestEnvelope } = handlerInput;
+        const type = Alexa.getRequestType(requestEnvelope);
+        const locale = Alexa.getLocale(requestEnvelope);
+        if (type !== 'IntentRequest') {
+            console.log(`${type} (${locale})`);
+        } else {
+            console.log(`${requestEnvelope.request.intent.name} (${locale})`);
+        }
+        console.log(`\n********** REQUEST *********\n${JSON.stringify(handlerInput, null, 4)}`);
+    })
+    .addResponseInterceptors(function (request, response) {
+        if (response) console.log(`\n************* RESPONSE **************\n${JSON.stringify(response, null, 4)}`);
+    })
     .lambda();
